@@ -1,12 +1,14 @@
-const Binance = require('./binance')
-
 class UDFError extends Error { }
 class SymbolNotFound extends UDFError { }
 class InvalidResolution extends UDFError { }
 
-class UDF {
-    constructor() {
-        this.binance = new Binance()
+/**
+ * Base UDF implementation
+ */
+class BaseUDF {
+    constructor(binanceAdapter, marketConfig) {
+        this.binance = binanceAdapter
+        this.marketConfig = marketConfig
         this.supportedResolutions = ['1', '3', '5', '15', '30', '60', '120', '240', '360', '480', '720', '1D', '3D', '1W', '1M']
 
         setInterval(() => { this.loadSymbols() }, 30000)
@@ -24,7 +26,7 @@ class UDF {
         }
 
         const promise = this.binance.exchangeInfo().catch(err => {
-            console.error(err)
+            console.error(`${this.marketConfig.name} error:`, err)
             setTimeout(() => {
                 this.loadSymbols()
             }, 1000)
@@ -41,9 +43,9 @@ class UDF {
                     name: symbol.symbol,
                     full_name: symbol.symbol,
                     description: `${symbol.baseAsset} / ${symbol.quoteAsset}`,
-                    exchange: 'BINANCE',
-                    listed_exchange: 'BINANCE',
-                    type: 'crypto',
+                    exchange: this.marketConfig.symbol.exchange,
+                    listed_exchange: this.marketConfig.symbol.listed_exchange,
+                    type: this.marketConfig.symbol.type,
                     currency_code: symbol.quoteAsset,
                     session: '24x7',
                     timezone: 'UTC',
@@ -108,15 +110,15 @@ class UDF {
         return {
             exchanges: [
                 {
-                    value: 'BINANCE',
-                    name: 'Binance',
-                    desc: 'Binance Exchange'
+                    value: this.marketConfig.symbol.exchange,
+                    name: this.marketConfig.displayName,
+                    desc: this.marketConfig.displayName
                 }
             ],
             symbols_types: [
                 {
-                    value: 'crypto',
-                    name: 'Cryptocurrency'
+                    value: this.marketConfig.symbol.type,
+                    name: this.marketConfig.symbol.type === 'crypto' ? 'Cryptocurrency' : 'Crypto Futures'
                 }
             ],
             supported_resolutions: this.supportedResolutions,
@@ -258,8 +260,9 @@ class UDF {
     }
 }
 
-UDF.Error = UDFError
-UDF.SymbolNotFound = SymbolNotFound
-UDF.InvalidResolution = InvalidResolution
+// 导出错误类供外部使用
+BaseUDF.UDFError = UDFError
+BaseUDF.SymbolNotFound = SymbolNotFound
+BaseUDF.InvalidResolution = InvalidResolution
 
-module.exports = UDF
+module.exports = BaseUDF 

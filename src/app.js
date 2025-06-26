@@ -7,11 +7,21 @@ app.use(cors())
 const morgan = require('morgan')
 app.use(morgan('tiny'))
 
+// 原有UDF (向后兼容)
 const UDF = require('./udf')
 const udf = new UDF()
 
-// Common
+// 新的市场特定UDF
+const SpotUDF = require('./services/spot-udf')
+const FuturesUDF = require('./services/futures-udf')
+const createMarketRoutes = require('./routes/market-routes')
+const BaseUDF = require('./services/base-udf')
 
+// 创建服务实例
+const spotUDF = new SpotUDF()
+const futuresUDF = new FuturesUDF()
+
+// Common
 const query = require('./query')
 
 function handlePromise(res, next, promise) {
@@ -75,6 +85,10 @@ app.get('/history', [
     ))
 })
 
+// 新增：现货和合约特定路由
+createMarketRoutes(spotUDF, 'spot')(app)
+createMarketRoutes(futuresUDF, 'futures')(app)
+
 // Handle errors
 
 app.use((err, req, res, next) => {
@@ -85,13 +99,13 @@ app.use((err, req, res, next) => {
         })
     }
 
-    if (err instanceof UDF.SymbolNotFound) {
+    if (err instanceof UDF.SymbolNotFound || err instanceof BaseUDF.SymbolNotFound) {
         return res.status(404).send({
             s: 'error',
             errmsg: 'Symbol Not Found'
         })
     }
-    if (err instanceof UDF.InvalidResolution) {
+    if (err instanceof UDF.InvalidResolution || err instanceof BaseUDF.InvalidResolution) {
         return res.status(400).send({
             s: 'error',
             errmsg: 'Invalid Resolution'
